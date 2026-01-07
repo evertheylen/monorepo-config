@@ -1,5 +1,5 @@
 import type { ZodObject } from "zod";
-import { Config, ConfigError, makeConfig } from "./index.js";
+import { Config, ConfigError, makeConfig } from "./basic.js";
 import { join } from "path";
 
 export type FileConfig<ConfigSchema extends ZodObject> = Config<ConfigSchema> & {
