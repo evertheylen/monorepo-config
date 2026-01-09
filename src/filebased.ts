@@ -1,45 +1,44 @@
 import type { ZodObject } from "zod";
-import { Config, ConfigError, makeConfig } from "./basic.js";
+import { Config, ConfigError, ConfigMeta } from "./basic.js";
 import { join } from "path";
 
-export type FileConfig<ConfigSchema extends ZodObject> = Config<ConfigSchema> & {
-  _meta: {
-    configDir: string;
-    envVar: string;
-  }
-};
+export async function loadFileIntoConfig<
+  PackageName extends string,
+  ConfigSchema extends ZodObject,
+  SubSchemas extends Record<string, ZodObject>,
+>(
+  config: Config<ConfigMeta<PackageName, ConfigSchema, SubSchemas> & { configDir: string }, ConfigSchema>,
+  envVar: string,
+  configDir?: string,
+): Promise<void>
 
-export function makeFileConfig<ConfigSchema extends ZodObject>(opts: {
-  envVar: string, directory: string, schema: ConfigSchema, preventAutoLoad?: boolean
-}): FileConfig<ConfigSchema> {
-  const cfg = makeConfig(opts.schema) as FileConfig<ConfigSchema>;
-  // imperative overrides here to not lose the Proxy
-  cfg._meta.configDir = opts.directory;
-  cfg._meta.envVar = opts.envVar;
+export async function loadFileIntoConfig<
+  PackageName extends string,
+  ConfigSchema extends ZodObject,
+  SubSchemas extends Record<string, ZodObject>,
+>(
+  config: Config<ConfigMeta<PackageName, ConfigSchema, SubSchemas>, ConfigSchema>,
+  envVar: string,
+  configDir: string,
+): Promise<void>
 
-  if (!opts.preventAutoLoad) {
-    queueMicrotask(async () => {
-      try {
-        await loadFileIntoConfig(cfg);
-      } catch (e) {
-        console.error(e);
-        process.exit(1);
-      }
-    });
-  }
-
-  return cfg;
-}
-
-export async function loadFileIntoConfig<ConfigSchema extends ZodObject>(config: FileConfig<ConfigSchema>) {
-  const config_name = process.env[config._meta.envVar];
+export async function loadFileIntoConfig<
+  PackageName extends string,
+  ConfigSchema extends ZodObject,
+  SubSchemas extends Record<string, ZodObject>,
+>(
+  config: Config<ConfigMeta<PackageName, ConfigSchema, SubSchemas> & { configDir: string }, ConfigSchema>,
+  envVar: string,
+  configDir?: string,
+): Promise<void> {
+  const config_name = process.env[envVar];
   if (config_name === undefined) {
-    throw new ConfigError(`Please set the environment variable ${config._meta.envVar}`);
+    throw new ConfigError(`Please set the environment variable ${envVar}`);
   }
-  const path = join(config._meta.configDir, `${config_name}.js`);
+  const path = join(configDir ?? config._meta.configDir, `${config_name}.js`);
   await import(path);
-  if (!config._meta.isUsable) {
-    console.warn(`Imported ${path} but config was still not marked as usable`);
+  if (!config._meta.isLoaded) {
+    console.warn(`Imported ${path} but config was still not marked as set`);
   }
 }
 
