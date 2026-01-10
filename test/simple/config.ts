@@ -1,21 +1,21 @@
 import z from "zod";
-import { makeConfig, setConfig } from "../../src/basic.ts";
-import { UtilConfig } from "../some_util/config.ts";
+import { makeConfig, setConfig } from "../../dist/index.js";
+import * as some_util from "../some_util/config.ts";
 
 console.log("simple/config.ts: start")
 
-const simpleConfig = makeConfig({
+const CONFIG = makeConfig({
   package: "simple",
   schema: z.object({
     enabled: z.boolean(),
     foo: z.string().default('bar'),
   }),
-  subConfigs: [ UtilConfig ]
+  subConfigs: [ some_util.CONFIG ]
 });
 
 console.log("simple/config.ts: made config")
 
-setConfig(simpleConfig, {
+setConfig(CONFIG, {
   simple: { enabled: true },
   some_util: { foo: 'world' }
 })

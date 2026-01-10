@@ -1,14 +1,14 @@
-import { setConfig } from "../dist/basic.js";
-import { UtilConfig } from "./some_util/config.ts";
+import { setConfig } from "../dist/index.js";
+import { CONFIG } from "./some_util/config.ts";
 
-console.log("UtilConfig.foo is", UtilConfig.foo);
+console.log("UtilConfig.foo is", CONFIG.foo);
 
 //@ts-expect-error
-setConfig(UtilConfig, {})
+setConfig(CONFIG, {})
 
-setConfig(UtilConfig, {
+setConfig(CONFIG, {
   some_util: {
-  //@ts-expect-error
+    //@ts-expect-error
     foo: 123
   }
 });

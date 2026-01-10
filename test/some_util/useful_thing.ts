@@ -1,11 +1,5 @@
-import { UtilConfig } from "./config.ts";
+import { CONFIG } from "./config.ts";
 
-console.log("someutil/useful_thing.ts: started")
+await CONFIG._meta.loaded;
 
-await UtilConfig._meta.loaded;
-
-console.log("useful_thing: config loaded")
-
-export const thing = `hello ${UtilConfig.foo}`;
-
-console.log("some_util: useful thing is ", thing);
+export const thing = `hello ${CONFIG.foo}`;

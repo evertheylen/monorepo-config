@@ -12,6 +12,7 @@ export type ConfigMeta<
   subConfigs: {[packageName in keyof SubSchemas & string]: Config<ConfigMeta<packageName, SubSchemas[packageName], any>, SubSchemas[packageName]>},
   isLoaded: boolean,
   loaded: Promise<void>,
+  input: ConfigInput<PackageName, ConfigSchema, SubSchemas>,
   _resolve: (value: void) => void,
   _reject: (error: Error) => void,
 }
@@ -97,10 +98,12 @@ export function makeConfig<
   }
 
   const _meta: ResultConfigMeta<PackageName, ConfigSchema, SubConfigsArray> = {
+    ...args, // overriden later:
     package: args.package,
     schema: args.schema,
     subConfigs: subConfigObject as any,
     isLoaded: false,
+    input: {} as any,  // will be set later
     loaded,
     _resolve,
     _reject,
@@ -111,7 +114,7 @@ export function makeConfig<
 }
 
 
-export type ConfigData<
+type ConfigInput<
   PackageName extends string,
   ConfigSchema extends ZodObject,
   SubSchemas extends Record<string, ZodObject>,
@@ -133,12 +136,12 @@ function setSingleConfig(config: AnyConfig, allData: any, allowOverride: boolean
     }
   }
 
+  config._meta.input = allData[config._meta.package];
   const subData = config._meta.schema.parse(allData[config._meta.package]);
   Object.assign(config, subData);
   if (!config._meta.isLoaded) {
     config._meta.isLoaded = true;
     config._meta._resolve();
-    console.debug("MARKING", config._meta.package, "AS LOADED");
   }
 }
 
@@ -148,7 +151,7 @@ export async function setConfig<
   SubSchemas extends Record<string, ZodObject>,
 >(
   config: Config<ConfigMeta<PackageName, ConfigSchema, SubSchemas>, ConfigSchema>,
-  inputData: ConfigData<PackageName, ConfigSchema, SubSchemas>,
+  inputData: ConfigInput<PackageName, ConfigSchema, SubSchemas>,
   opts?: { forceOverride: boolean }
 ) {
   const override = opts?.forceOverride ?? false;

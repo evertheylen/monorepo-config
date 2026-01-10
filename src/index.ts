@@ -1,2 +1,2 @@
-export { makeConfig, forceOverrideConfig, setConfig } from "./basic.js";
-export { loadFileIntoConfig } from "./filebased.js";
+export { makeConfig, setConfig } from "./basic.js";
+export { loadProfileIntoConfig } from "./profile.js";
