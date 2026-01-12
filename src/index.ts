@@ -1,2 +1,2 @@
-export { makeConfig, setConfig } from "./basic.js";
-export { loadProfileIntoConfig } from "./profile.js";
+export { defineConfig, setConfig, getConfig } from "./basic.js";
+export { loadConfigProfile } from "./profile.js";

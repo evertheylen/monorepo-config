@@ -4,68 +4,83 @@ Javascript package to help with managing configs, primarily for monorepos. Uses 
 
 ## Basic usage
 
-```ts
-import { makeConfig, setConfig } from "monorepo-config";
+Always split your config in two parts: one which defines the format/types, and another that actually gets the config data.
 
-export const CONFIG = makeConfig(z.object({
-  foobar: z.string(),
-}));
-
-setConfig(CONFIG, { foobar: 'test' });
-
-CONFIG.foobar // --> 'test';
-```
-
-Basic functionality is not much more than running `.parse` on your schema, some error reporting and being a bit smart regarding defaults. You can only `setConfig` once, otherwise use `forceOverrideConfig`.
-
-
-## File-based usage
-
-This is more interesting, and allows you to replace the mess of untyped, unchecked env vars across packages with something more manageable (inspired by [Django](https://docs.djangoproject.com/en/6.0/topics/settings/)).
-
-Create a directory `src/configs`. Then create a file `src/configs/schema.ts`:
+First create a `config-def.ts` file:
 
 ```ts
-import { makeFileConfig } from "monorepo-config";
+import { defineConfig } from "monorepo-config";
+import { otherConfigDef } from "some-dependency"; // optional
 
-export const FOO_CONFIG = makeFileConfig({
-  envVar: 'FOO_CONFIG',
-  directory: import.meta.dirname,
+export const configDef = makeConfig({
+  package: 'your-package',
   schema: z.object({
-    foo: z.string()
-  })
+    foobar: z.string(),
+  }),
+  depedencies: [ otherConfigDef ]
 });
 ```
 
-For simplicity, the name of the environment variable and the config object are the same. Now you can define "profiles" in the same directory, like `src/configs/production.ts`:
+In another file `config.ts` you can do:
 
 ```ts
-import { setConfig } from "monorepo-config";
-import { FOO_CONFIG } from "./schema.js";
+import { getConfig } from "monorepo-config";
+import { configDef } from "./config-def.ts";
 
-setConfig(FOO_CONFIG, {
-  foo: 'bar'
+export const config = await getConfig(configDef);
+```
+
+Actually setting the config happens in yet another place. Using `setConfig(configDef, { ... })` directly can be tricky because of await-deadlocks. You probably want to use "profiles", as discussed next.
+
+
+## Profile-based usage
+
+This allows you to replace the mess of untyped, unchecked env vars across packages with something more manageable (inspired by [Django](https://docs.djangoproject.com/en/6.0/topics/settings/)).
+
+First you can (optionally) set `profileDir` on your configuration definition:
+
+```ts
+export const configDef = makeConfig({
+  package: 'your-package',
+  schema: z.object({
+    foobar: z.string(),
+  }),
+  depedencies: [ otherConfigDef ],
+  profileDir: import.meta.dirname,
 });
 ```
 
-Lastly, load the config file based on the environment variable `FOO_CONFIG` in a file `src/configs/config.ts` (or some other file that initializes global variables):
+You can then load the chosen configuration based on a single environment variable like so:
 
 ```ts
-import { loadFileIntoConfig } from "monorepo-config";
-import { FOO_CONFIG } from "./schema.js";
+import { loadConfigProfile } from "monorepo-config";
+import { configDef } from "./config-def.ts";
 
-await loadFileIntoConfig(FOO_CONFIG);
+export const FOOBAR_CONFIG = await loadConfigProfile(configDef, 'FOOBAR_CONFIG');
 ```
 
-The idea is to use the same environment variable for all packages in your monorepo (this mirrors `DJANGO_SETTINGS_MODULE`).
+Profiles are just typescript files like this:
+
+```ts
+import type { configDef } from "./config-def.ts";
+
+export default {
+  'your-package': {
+    foobar: 'quuz'
+  },
+  'other-config': { ... }
+} satisfies typeof configDef.input;
+```
+
+You can choose, like the example, to use the same name the configuration object as the environment variable. The idea is to use the same environment variable for all packages in your monorepo (this mirrors `DJANGO_SETTINGS_MODULE`).
 
 
 ## Which to use?
 
-You can mix both in your monorepo! Packages representing reusable libraries probably want to stick with the basic usage. Packages that represent apps probably want to define their own config in a file-based manner. In such cases, you are expected to do multiple `setConfig` calls in a "profile": one for the app itself and then multiple `setConfig` calls for the internal libraries the app uses.
+You can mix both in your monorepo! Packages representing reusable libraries probably want to stick with the basic usage and let other packages define their config. Packages that represent apps probably want to define their own config using profiles.
 
 
 ## TODO
 
 - [ ] Vite plugin
-- [ ] Explore usage in tests
+

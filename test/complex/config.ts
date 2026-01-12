@@ -1,6 +1,5 @@
-import { CONFIG } from "./schema.ts";
-import { loadProfileIntoConfig } from "../../dist/index.js";
+import { configDef } from "./config-def.ts";
+import { loadConfigProfile } from "../../dist/index.js";
 
-await loadProfileIntoConfig(CONFIG, 'CONFIG');
+export const config = await loadConfigProfile(configDef, 'CONFIG');
 
-export { CONFIG };

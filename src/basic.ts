@@ -2,37 +2,30 @@ import { z, type ZodObject, type input, type output } from "zod";
 
 export class ConfigError extends Error { }
 
-export type ConfigMeta<
+export type ConfigDefinition<
   PackageName extends string,
   ConfigSchema extends ZodObject,
   SubSchemas extends Record<string, ZodObject>,
 > = {
   package: PackageName,
   schema: ConfigSchema,
-  subConfigs: {[packageName in keyof SubSchemas & string]: Config<ConfigMeta<packageName, SubSchemas[packageName], any>, SubSchemas[packageName]>},
+  dependencies: {[packageName in keyof SubSchemas & string]: ConfigDefinition<packageName, SubSchemas[packageName], any>},
+  // will be set later
+  input: ConfigInput<PackageName, ConfigSchema, SubSchemas>,
+  output: output<ConfigSchema>,  // wrapped in proxy
+  // status:
   isLoaded: boolean,
   loaded: Promise<void>,
-  input: ConfigInput<PackageName, ConfigSchema, SubSchemas>,
   _resolve: (value: void) => void,
   _reject: (error: Error) => void,
 }
 
-export type Config<
-  Meta,
-  ConfigSchema extends ZodObject,
-> = (
-  { _meta: Meta } & output<ConfigSchema>
-);
+export type AnyConfigDefinition = ConfigDefinition<string, any, any>;
 
-export type AnyConfig = Config<ConfigMeta<string, any, any>, any>;
-
-function wrapInProxy<T extends object & { _meta: { isLoaded: boolean } }>(obj: T) {
-  return new Proxy(obj, {
+function wrapInProxy<T extends object>(data: T, definition: { isLoaded: boolean }) {
+  return new Proxy(data, {
     get(target, prop, receiver) {
-      if (prop === '_meta') {
-        return target._meta;
-      }
-      if (!target._meta.isLoaded) {
+      if (!definition.isLoaded) {
         throw new Error("Tried to access config but it is not set yet. Did you forget to set or load the config?");
       }
       return (target as any)[prop];
@@ -42,34 +35,34 @@ function wrapInProxy<T extends object & { _meta: { isLoaded: boolean } }>(obj: T
 
 type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never;
 
-type ResultConfigMeta<
+type ResultConfigDefinition<
   PackageName extends string,
   ConfigSchema extends ZodObject,
-  SubConfigsArray extends Config<ConfigMeta<string, any, any>, any>[]
-> = ConfigMeta<PackageName, ConfigSchema, (
+  SubDefinitionArray extends AnyConfigDefinition[]
+> = ConfigDefinition<PackageName, ConfigSchema, (
   {
-    // first the configured subconfigs
-    [SubConfig in SubConfigsArray[number] as SubConfig['_meta']['package']]: (
-      SubConfig extends { _meta: { schema: infer SubSchema }} ? SubSchema : never
+    // first the direct subdefinitions
+    [SubDefinition in SubDefinitionArray[number] as SubDefinition['package']]: (
+      SubDefinition extends { schema: infer SubSchema } ? SubSchema : never
     )
   } & {
     // also the subconfigs of the subconfigs
-    [SubSubPkg in keyof UnionToIntersection<SubConfigsArray[number]['_meta']['subConfigs']>]: (
+    [SubSubPkg in keyof UnionToIntersection<SubDefinitionArray[number]['dependencies']>]: (
       // @ts-ignore (should be ok)
-      UnionToIntersection<SubConfigsArray[number]['_meta']['subConfigs']>[SubSubPkg]['_meta']['schema']
+      UnionToIntersection<SubDefinitionArray[number]['dependencies']>[SubSubPkg]['schema']
     )
 })>;
 
-export function makeConfig<
-  const PackageName extends string,
-  const ConfigSchema extends ZodObject,
-  const SubConfigsArray extends Config<ConfigMeta<string, any, any>, any>[],
+export function defineConfig<
+  PackageName extends string,
+  ConfigSchema extends ZodObject,
+  SubDefinitionArray extends AnyConfigDefinition[],
   const Extra extends object = {}
 >(args: {
   package: PackageName,
   schema: ConfigSchema,
-  subConfigs: SubConfigsArray,
-} & Extra): Config<ResultConfigMeta<PackageName, ConfigSchema, SubConfigsArray> & Omit<Extra, 'package' | 'schema' | 'subConfigs'>, ConfigSchema> {
+  dependencies: SubDefinitionArray,
+} & Extra): ResultConfigDefinition<PackageName, ConfigSchema, SubDefinitionArray> & Omit<Extra, keyof AnyConfigDefinition> {
 
   let _resolve!: (value: void) => void;
   let _reject!: (error: Error) => void;
@@ -78,39 +71,43 @@ export function makeConfig<
     _reject = reject;
   })
 
-  const subConfigObject = {} as any;
+  const subDefinitionRegistry = {} as any;
 
-  const registerConfig = (subConfig: Config<ConfigMeta<string, any, any>, any>) => {
-    const subPkg = subConfig._meta.package;
-    const prevRegisteredConfig = subConfigObject[subPkg];
-    if (prevRegisteredConfig === undefined) {
-      subConfigObject[subPkg] = subConfig;
-    } else if (prevRegisteredConfig !== subConfig) {
-      throw new ConfigError(`Package name '${subPkg}' is used for two different configs`);
+  const registerConfig = (definition: AnyConfigDefinition) => {
+    const subPkg = definition.package;
+    const prevRegisteredDefinition = subDefinitionRegistry[subPkg];
+    if (prevRegisteredDefinition === undefined) {
+      subDefinitionRegistry[subPkg] = definition;
+    } else if (prevRegisteredDefinition !== definition) {
+      throw new ConfigError(`Package name '${subPkg}' is used for two different config definitions`);
     }
   }
 
-  for (const subConfig of args.subConfigs) {
+  for (const subConfig of args.dependencies) {
     registerConfig(subConfig);
-    for (const subSubConfig of Object.values(subConfig._meta.subConfigs)) {
-      registerConfig(subSubConfig);
+    for (const subSubDefinition of Object.values(subConfig.dependencies)) {
+      registerConfig(subSubDefinition);
     }
   }
 
-  const _meta: ResultConfigMeta<PackageName, ConfigSchema, SubConfigsArray> = {
-    ...args, // overriden later:
+  const definition = {
+    ...args,
     package: args.package,
     schema: args.schema,
-    subConfigs: subConfigObject as any,
+    dependencies: subDefinitionRegistry as any,
+    // will be set later
+    input: {} as any,
+    output: {} as any,
+    // promise-related:
     isLoaded: false,
-    input: {} as any,  // will be set later
     loaded,
     _resolve,
     _reject,
   };
   
-  // @ts-expect-error for simplicity, the types assume that config is always defined.
-  return wrapInProxy({ _meta });
+  definition.output = wrapInProxy(definition.output, definition);
+
+  return definition;
 }
 
 
@@ -123,25 +120,25 @@ type ConfigInput<
   & { [subPackageName in keyof SubSchemas]: input<SubSchemas[subPackageName]> }
 );
 
-function setSingleConfig(config: AnyConfig, allData: any, allowOverride: boolean) {
-  if (!(config._meta.package in allData)) {
-    throw new Error(`Expected config for package "${config._meta.package}"`);
+function setSingleConfig(definition: AnyConfigDefinition, allData: any, allowOverride: boolean) {
+  if (!(definition.package in allData)) {
+    throw new Error(`Expected config for package "${definition.package}"`);
   }
 
-  if (config._meta.isLoaded) {
+  if (definition.isLoaded) {
     if (allowOverride) {
-      console.warn(`WARNING: Overriding config for "${config._meta.package}"!`);
+      console.warn(`WARNING: Overriding config for "${definition.package}"!`);
     } else {
-      throw new ConfigError(`Can't override config "${config._meta.package}" as it is already set`);
+      throw new ConfigError(`Can't override config "${definition.package}" as it is already set`);
     }
   }
 
-  config._meta.input = allData[config._meta.package];
-  const subData = config._meta.schema.parse(allData[config._meta.package]);
-  Object.assign(config, subData);
-  if (!config._meta.isLoaded) {
-    config._meta.isLoaded = true;
-    config._meta._resolve();
+  definition.input = allData[definition.package];
+  const subData = definition.schema.parse(allData[definition.package]);
+  Object.assign(definition.output, subData);
+  if (!definition.isLoaded) {
+    definition.isLoaded = true;
+    definition._resolve();
   }
 }
 
@@ -150,14 +147,25 @@ export async function setConfig<
   ConfigSchema extends ZodObject,
   SubSchemas extends Record<string, ZodObject>,
 >(
-  config: Config<ConfigMeta<PackageName, ConfigSchema, SubSchemas>, ConfigSchema>,
+  definition: ConfigDefinition<PackageName, ConfigSchema, SubSchemas>,
   inputData: ConfigInput<PackageName, ConfigSchema, SubSchemas>,
   opts?: { forceOverride: boolean }
 ) {
   const override = opts?.forceOverride ?? false;
-  setSingleConfig(config, inputData, override);
+  setSingleConfig(definition, inputData, override);
 
-  for (const subConfig of Object.values(config._meta.subConfigs)) {
-    setSingleConfig(subConfig, inputData, override);
+  for (const subDefinition of Object.values(definition.dependencies)) {
+    setSingleConfig(subDefinition, inputData, override);
   }
+}
+
+export async function getConfig<
+  PackageName extends string,
+  ConfigSchema extends ZodObject,
+  SubSchemas extends Record<string, ZodObject>,
+>(
+  definition: ConfigDefinition<PackageName, ConfigSchema, SubSchemas>,
+): Promise<output<ConfigSchema>> {
+  await definition.loaded;
+  return definition.output;
 }

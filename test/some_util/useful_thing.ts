@@ -1,5 +1,3 @@
-import { CONFIG } from "./config.ts";
+import { config } from "./config.ts";
 
-await CONFIG._meta.loaded;
-
-export const thing = `hello ${CONFIG.foo}`;
+export const thing = `hello ${config.foo}`;

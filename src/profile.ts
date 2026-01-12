@@ -1,46 +1,52 @@
-import type { ZodObject } from "zod";
-import { Config, ConfigError, ConfigMeta, setConfig } from "./basic.js";
+import type { output, ZodObject } from "zod";
+import { ConfigError, ConfigDefinition, setConfig } from "./basic.js";
 import { join } from "path";
 
-export async function loadProfileIntoConfig<
+export async function loadConfigProfile<
   PackageName extends string,
   ConfigSchema extends ZodObject,
   SubSchemas extends Record<string, ZodObject>,
 >(
-  config: Config<ConfigMeta<PackageName, ConfigSchema, SubSchemas> & { profileDir: string, profileSuffix?: string }, ConfigSchema>,
+  config: ConfigDefinition<PackageName, ConfigSchema, SubSchemas> & { profileDir: string, profileSuffix?: string },
   envVar: string,
   profileDir?: string,
-): Promise<void>
+): Promise<output<ConfigSchema>>
 
-export async function loadProfileIntoConfig<
+export async function loadConfigProfile<
   PackageName extends string,
   ConfigSchema extends ZodObject,
   SubSchemas extends Record<string, ZodObject>,
 >(
-  config: Config<ConfigMeta<PackageName, ConfigSchema, SubSchemas> & { profileSuffix?: string }, ConfigSchema>,
+  config: ConfigDefinition<PackageName, ConfigSchema, SubSchemas> & { profileSuffix?: string },
   envVar: string,
   profileDir: string,
-): Promise<void>
+): Promise<output<ConfigSchema>>
 
-export async function loadProfileIntoConfig<
+export async function loadConfigProfile<
   PackageName extends string,
   ConfigSchema extends ZodObject,
   SubSchemas extends Record<string, ZodObject>,
 >(
-  config: Config<ConfigMeta<PackageName, ConfigSchema, SubSchemas> & { profileDir: string, profileSuffix?: string }, ConfigSchema>,
+  config: ConfigDefinition<PackageName, ConfigSchema, SubSchemas> & { profileDir?: string, profileSuffix?: string },
   envVar: string,
   profileDir?: string,
-): Promise<void> {
+): Promise<output<ConfigSchema>> {
   const configName = process.env[envVar];
   if (configName === undefined) {
     throw new ConfigError(`Please set the environment variable ${envVar}`);
   }
-  const path = join(profileDir ?? config._meta.profileDir, `${configName}.${config._meta.profileSuffix ?? 'js'}`);
+  profileDir = profileDir ?? config.profileDir;
+  if (profileDir === undefined) {
+    throw new ConfigError(`Either give profileDir as an argument or set profileDir in the config metadata`);
+  }
+  const path = join(profileDir, `${configName}.${config.profileSuffix ?? 'js'}`);
   const data = (await import(path)).default;
   setConfig(config, data);
 
-  if (!config._meta.isLoaded) {
+  if (!config.isLoaded) {
     console.warn(`Imported ${path} but config was still not marked as set`);
   }
+
+  return config.output;
 }
 

@@ -1,10 +1,4 @@
-import z from "zod";
-import { makeConfig } from "../../dist/index.js";
+import { getConfig } from "../../dist/basic.js";
+import { configDef } from "./config-def.ts";
 
-export const CONFIG = makeConfig({
-  package: 'some_util',
-  schema: z.object({
-    foo: z.string()
-  }),
-  subConfigs: []
-});
+export const config = await getConfig(configDef);
