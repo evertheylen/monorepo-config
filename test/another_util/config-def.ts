@@ -7,5 +7,6 @@ export const configDef = defineConfig({
   schema: z.object({
     foo2: z.string()
   }),
-  dependencies: [ some_util ]
+  dependencies: [ some_util ],
+  profileSuffix: 'ts',
 });

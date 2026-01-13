@@ -132,6 +132,11 @@ function setSingleConfig(definition: AnyConfigDefinition, allData: any, allowOve
     throw new Error(`Expected config for package "${definition.package}"`);
   }
 
+  // allow setting the same config twice
+  if (definition.isLoaded && definition.input === allData[definition.package]) {
+    return;
+  }
+
   if (definition.isLoaded) {
     if (allowOverride) {
       console.warn(`WARNING: Overriding config for "${definition.package}"!`);
