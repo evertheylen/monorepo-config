@@ -1,6 +1,6 @@
 {
   "name": "monorepo-config",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Managed and validated configs across packages (no deps, but bring your own zod)",
   "main": "./dist/index.js",
   "type": "module",

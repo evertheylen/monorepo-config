@@ -35,11 +35,7 @@ function wrapInProxy<T extends object>(data: T, definition: { isLoaded: boolean 
 
 type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never;
 
-type ResultConfigDefinition<
-  PackageName extends string,
-  ConfigSchema extends ZodObject,
-  SubDefinitionArray extends AnyConfigDefinition[]
-> = ConfigDefinition<PackageName, ConfigSchema, (
+type ToSubDefinitionObject<SubDefinitionArray extends AnyConfigDefinition[]> = (
   {
     // first the direct subdefinitions
     [SubDefinition in SubDefinitionArray[number] as SubDefinition['package']]: (
@@ -51,7 +47,13 @@ type ResultConfigDefinition<
       // @ts-ignore (should be ok)
       UnionToIntersection<SubDefinitionArray[number]['dependencies']>[SubSubPkg]['schema']
     )
-})>;
+});
+
+type ResultConfigDefinition<
+  PackageName extends string,
+  ConfigSchema extends ZodObject,
+  SubDefinitionArray extends AnyConfigDefinition[]
+> = ConfigDefinition<PackageName, ConfigSchema, ToSubDefinitionObject<SubDefinitionArray>>;
 
 export function defineConfig<
   PackageName extends string,
@@ -119,6 +121,11 @@ type ConfigInput<
   Record<PackageName, input<ConfigSchema>>
   & { [subPackageName in keyof SubSchemas]: input<SubSchemas[subPackageName]> }
 );
+
+// helper type for unified profiles
+export type MergeConfigTypes<ConfigDefs extends AnyConfigDefinition[]> = {
+  [key in keyof ToSubDefinitionObject<ConfigDefs>]: input<ToSubDefinitionObject<ConfigDefs>[key]>
+};
 
 function setSingleConfig(definition: AnyConfigDefinition, allData: any, allowOverride: boolean) {
   if (!(definition.package in allData)) {
