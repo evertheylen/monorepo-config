@@ -1,6 +1,15 @@
-import { z, type ZodObject, type input, type output } from "zod";
+import type { ZodError, ZodObject, input, output } from "zod";
 
 export class ConfigError extends Error { }
+
+export class ZodConfigError extends ConfigError {
+  constructor(
+    public packageName: string,
+    public zodError: ZodError,
+  ) {
+    super();
+  }
+}
 
 export type ConfigDefinition<
   PackageName extends string,
@@ -20,7 +29,7 @@ export type ConfigDefinition<
   _reject: (error: Error) => void,
 }
 
-export type AnyConfigDefinition = ConfigDefinition<string, any, any>;
+export type AnyConfigDefinition = ConfigDefinition<string, ZodObject, any>;
 
 function wrapInProxy<T extends object>(data: T, definition: { isLoaded: boolean }) {
   return new Proxy(data, {
@@ -146,15 +155,20 @@ function setSingleConfig(definition: AnyConfigDefinition, allData: any, allowOve
   }
 
   definition.input = allData[definition.package];
-  const subData = definition.schema.parse(allData[definition.package]);
-  Object.assign(definition.output, subData);
-  if (!definition.isLoaded) {
-    definition.isLoaded = true;
-    definition._resolve();
+  // Note that definition._reject would go nowhere
+  let subData = definition.schema.safeParse(allData[definition.package]);
+  if (subData.success) {
+    Object.assign(definition.output, subData.data);
+    if (!definition.isLoaded) {
+      definition.isLoaded = true;
+      definition._resolve();
+    }
+  } else {
+    throw new ZodConfigError(definition.package, subData.error);
   }
 }
 
-export async function setConfig<
+export function setConfig<
   PackageName extends string,
   ConfigSchema extends ZodObject,
   SubSchemas extends Record<string, ZodObject>,

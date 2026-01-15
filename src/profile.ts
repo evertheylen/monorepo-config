@@ -44,7 +44,7 @@ export async function loadConfigProfile<
   setConfig(config, data);
 
   if (!config.isLoaded) {
-    console.warn(`Imported ${path} but config was still not marked as set`);
+    console.warn(`WARNING: Imported ${path} into ${config.package} but config was still not marked as set`);
   }
 
   return config.output;
