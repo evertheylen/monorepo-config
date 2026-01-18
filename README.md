@@ -80,6 +80,13 @@ You can choose, like the example, to use the same name the configuration object 
 You can mix both in your monorepo! Packages representing reusable libraries probably want to stick with the basic usage and let other packages define their config. Packages that represent apps probably want to define their own config using profiles.
 
 
+## Common errors
+
+### Package name '...' is used for two different config definitions
+
+Your package manager may have included two different copies of the same code. Run `pnpm dedupe`, or manually inspect your lockfile to verify this. If not, add `console.trace()` calls to the `defineConfig` function to figure out exactly where the configs are defined.
+
+
 ## TODO
 
 - [ ] Vite plugin
