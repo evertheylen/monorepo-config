@@ -8,6 +8,4 @@ export const configDef = defineConfig({
     bla: z.string()
   }),
   dependencies: [ another_util ],
-  profileDir: import.meta.dirname,
-  profileSuffix: 'ts',
 });

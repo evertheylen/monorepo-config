@@ -1,8 +1,7 @@
-import { join } from "path";
-import { loadConfigProfile } from "../../dist/index.js";
+import { loadConfigProfile, loadProfileByEnvVar } from "../../dist/index.js";
 import { configDef } from "./config-def.ts";
 
-// loading config from central profile directory
-console.log("dirname", join(import.meta.dirname, '../complex'));
-export const CONFIG = await loadConfigProfile(configDef, 'CONFIG', join(import.meta.dirname, '../complex'));
+const loader = loadProfileByEnvVar('CONFIG', (profile) => import(`../complex/${profile}.ts`).then(x => x.default));
+
+export const CONFIG = await loadConfigProfile(configDef, loader);
 
