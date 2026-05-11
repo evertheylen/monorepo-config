@@ -1,8 +1,8 @@
 import z from "zod";
 import { defineConfig } from "../../dist/index.js";
-import { configDef as another_util } from "../another_util/config-def.ts";
+import { another_util as another_util } from "../another_util/config-def.ts";
 
-export const configDef = defineConfig({
+export const complex = defineConfig({
   package: 'complex',
   schema: z.object({
     bla: z.string()

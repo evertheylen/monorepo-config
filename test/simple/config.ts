@@ -1,7 +1,7 @@
 import z from "zod";
 import { defineConfig, getConfig, setConfig } from "../../dist/index.js";
 
-import { configDef as some_util } from "../some_util/config-def.ts";
+import { some_util } from "../some_util/config-def.ts";
 
 console.log("simple/config.ts: start")
 
