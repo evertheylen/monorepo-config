@@ -48,8 +48,7 @@ export async function loadConfigProfile<
   if (loader === undefined) {
     throw new ConfigError(`Either give loader as an argument or set loader in the config metadata`);
   }
-  console.debug("LOADER IS", loader);
-  //const path = join(loader, `${configName}.${config.profileSuffix ?? 'js'}`);
+  
   const data = await loader();
   setConfig(config, data as any);
 

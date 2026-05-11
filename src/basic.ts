@@ -132,9 +132,10 @@ type ConfigInput<
 );
 
 // helper type for unified profiles
-export type MergeConfigTypes<ConfigDefs extends AnyConfigDefinition[]> = {
-  [key in keyof ToSubDefinitionObject<ConfigDefs>]: input<ToSubDefinitionObject<ConfigDefs>[key]>
-};
+export type MergeConfigTypes<ConfigDefs extends AnyConfigDefinition[], OptionalConfigDefs extends AnyConfigDefinition[] = []> = (
+  { [key in keyof ToSubDefinitionObject<ConfigDefs>]: input<ToSubDefinitionObject<ConfigDefs>[key]> }
+  & { [key in keyof ToSubDefinitionObject<OptionalConfigDefs>]?: input<ToSubDefinitionObject<ConfigDefs>[key]> }
+);
 
 function setSingleConfig(definition: AnyConfigDefinition, allData: any, allowOverride: boolean) {
   if (!(definition.package in allData)) {
